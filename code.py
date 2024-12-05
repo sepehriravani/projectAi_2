@@ -1,8 +1,16 @@
 import random
 import matplotlib.pyplot as plt
 
-# محاسبه مقدار Fitness به صورت دستی
-def calculate_fitness_manual(portfolio, returns, covariance):
+# Function to read data from a file
+def read_input(file_path):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+    returns = list(map(float, lines[0].split()))
+    covariance = [list(map(float, line.split())) for line in lines[1:]]
+    return returns, covariance
+
+# Function to calculate fitness
+def calculate_fitness(portfolio, returns, covariance):
     portfolio_return = sum(portfolio[i] * returns[i] for i in range(len(returns)))
     portfolio_variance = 0
     for i in range(len(returns)):
@@ -11,14 +19,14 @@ def calculate_fitness_manual(portfolio, returns, covariance):
     portfolio_risk = portfolio_variance ** 0.5
     return portfolio_return / portfolio_risk if portfolio_risk != 0 else 0
 
-# پیاده‌سازی الگوریتم Beam Search
-def beam_search_manual(returns, covariance, beam_width=5, iterations=50):
+# Beam Search Algorithm
+def beam_search(returns, covariance, beam_width=5, iterations=50):
     num_assets = len(returns)
     current_solutions = [[random.random() for _ in range(num_assets)] for _ in range(beam_width)]
     for solution in current_solutions:
         total = sum(solution)
         for i in range(len(solution)):
-            solution[i] /= total  # نرمال‌سازی پرتفولیوها
+            solution[i] /= total  # Normalize
 
     best_solution = None
     best_fitness = 0
@@ -33,10 +41,10 @@ def beam_search_manual(returns, covariance, beam_width=5, iterations=50):
                 modified_solution = [max(0, x) for x in modified_solution]
                 total = sum(modified_solution)
                 for j in range(len(modified_solution)):
-                    modified_solution[j] /= total  # نرمال‌سازی
+                    modified_solution[j] /= total  # Normalize
                 new_solutions.append(modified_solution)
 
-        fitness_values = [calculate_fitness_manual(solution, returns, covariance) for solution in new_solutions]
+        fitness_values = [calculate_fitness(solution, returns, covariance) for solution in new_solutions]
         sorted_solutions = sorted(
             zip(new_solutions, fitness_values), key=lambda x: x[1], reverse=True
         )
@@ -49,7 +57,46 @@ def beam_search_manual(returns, covariance, beam_width=5, iterations=50):
 
     return best_solution, best_fitness, fitness_progression
 
-# رسم نمودار پیشرفت Fitness
+# Simulated Annealing Algorithm
+def simulated_annealing(returns, covariance, initial_temp=1000, cooling_rate=0.95, iterations=1000):
+    num_assets = len(returns)
+    current_solution = [random.random() for _ in range(num_assets)]
+    total = sum(current_solution)
+    for i in range(len(current_solution)):
+        current_solution[i] /= total  # Normalize
+    current_fitness = calculate_fitness(current_solution, returns, covariance)
+
+    best_solution = current_solution[:]
+    best_fitness = current_fitness
+    fitness_progression = []
+
+    temperature = initial_temp
+
+    for _ in range(iterations):
+        new_solution = current_solution[:]
+        for i in range(num_assets):
+            new_solution[i] += random.uniform(-0.1, 0.1)
+        new_solution = [max(0, x) for x in new_solution]
+        total = sum(new_solution)
+        for i in range(len(new_solution)):
+            new_solution[i] /= total  # Normalize
+
+        new_fitness = calculate_fitness(new_solution, returns, covariance)
+        fitness_progression.append(current_fitness)
+
+        if new_fitness > current_fitness or random.random() < (2.718 ** ((new_fitness - current_fitness) / temperature)):
+            current_solution = new_solution[:]
+            current_fitness = new_fitness
+
+        if current_fitness > best_fitness:
+            best_fitness = current_fitness
+            best_solution = current_solution[:]
+
+        temperature *= cooling_rate
+
+    return best_solution, best_fitness, fitness_progression
+
+# Plot fitness progression
 def plot_fitness_progression(data, title="Fitness Progression", x_label="Iteration", y_label="Fitness"):
     plt.figure(figsize=(10, 6))
     plt.plot(range(1, len(data) + 1), data, marker='o', linestyle='-', color='blue', label="Fitness")
@@ -61,21 +108,18 @@ def plot_fitness_progression(data, title="Fitness Progression", x_label="Iterati
     plt.tight_layout()
     plt.show()
 
-# داده‌های نمونه
-returns_example = [0.1, 0.2, 0.15, 0.3]
-covariance_example = [
-    [0.005, 0.002, 0.001, 0.002],
-    [0.002, 0.004, 0.002, 0.001],
-    [0.001, 0.002, 0.003, 0.002],
-    [0.002, 0.001, 0.002, 0.006],
-]
+# Main execution
+file_path = '/mnt/data/sample_input.txt'  # Replace with your input file path
+returns, covariance = read_input(file_path)
 
-# اجرای الگوریتم Beam Search
-best_solution, best_fitness, fitness_progression = beam_search_manual(returns_example, covariance_example)
+# Execute Beam Search
+best_solution_beam, best_fitness_beam, fitness_progression_beam = beam_search(returns, covariance)
+print("Beam Search Best Solution:", best_solution_beam)
+print("Beam Search Best Fitness:", best_fitness_beam)
+plot_fitness_progression(fitness_progression_beam, title="Beam Search Fitness Progression")
 
-# نمایش نتایج
-print("Best Portfolio:", best_solution)
-print("Best Fitness (Return/Risk):", best_fitness)
-
-# رسم نمودار پیشرفت Fitness
-plot_fitness_progression(fitness_progression, title="Fitness Progression (Beam Search)")
+# Execute Simulated Annealing
+best_solution_sa, best_fitness_sa, fitness_progression_sa = simulated_annealing(returns, covariance)
+print("Simulated Annealing Best Solution:", best_solution_sa)
+print("Simulated Annealing Best Fitness:", best_fitness_sa)
+plot_fitness_progression(fitness_progression_sa, title="Simulated Annealing Fitness Progression")
